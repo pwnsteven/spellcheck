@@ -2,19 +2,32 @@ import hashlib
 import re
 import requests
 import traceback
+import unittest
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def request_util(session, url):
+    """ A request utility to use across the program
+
+    Arguments:
+        session: The Session object
+        url: The url
+    """
+
     try:
-        response = session.get(url)
+        response = session.get(url, timeout=3)
         return response
     except Exception:
         raise
 
 
 def get_document(session):
+    """ Document getter
+
+    Argument:
+        session: The Session object
+    """
     response = request_util(session, 'https://outside-interview.herokuapp.com/document')
     status = response.status_code
     if status != 200:
@@ -25,32 +38,45 @@ def get_document(session):
 
 
 def clean_and_format_document(doc_text):
+    """ Clean the words in the provided document and format them in a list to be validated.
 
-    # Split hyphens and spaces
+    Clean: Remove all non-alpha characters (eg. commas, periods, exclamations, etc.) and line breaks
+    Format: Create a list of all words, breaking them at spaces and hyphens
+    """
+
     doc_split_by_word = re.split(' |-', doc_text.replace('\n', ' '))
 
-    # Remove garbage, but keep apostrophized words
     words = []
     for word in doc_split_by_word:
         clean_word = re.sub(r"[^A-Za-z']", "", word)
-        if clean_word:
+        if clean_word:  # Remove empty entries
             words.append(clean_word)
 
     return words
 
 
-def validate_and_hash(misspelled_words):
-    """ value: ['NOLS', 'roling', 'thraot', "NOLS's", 'benaeth'] """
+def validate_and_hash(misspelled_words, doc_text):
+    """ Utility to format and hash the list of misspelled words
 
-    # TODO: Double check this logic and write up some UTs. Don't have much experience with hashlib library...
+    Arguments:
+        misspelled_words: List of misspelled words
+        doc_text: The document text
+    """
 
     if not misspelled_words:
         raise Exception(f'No words misspelled words found')
 
-    # Concatenate and has (md5) the misspelled words to reveal the email address
+    # Since calls are ran in parallel, we need to validate that the misspelled words are sequential
+    doc_idx = 0
+    for word in misspelled_words:
+        idx = doc_text.find(word)
+        if idx < doc_idx:
+            raise Exception(f'Misspelled words are out of alignment. Need to re-verify')
+        doc_idx = idx
+
     hash_this = ''.join(misspelled_words)
-    hash_obj = hashlib.md5(hash_this.encode())      # I guess this needs to be encoded first
-    email_address = hash_obj.hexdigest().lower()    # Get lower-case hexdigest per specs
+    hash_obj = hashlib.md5(hash_this.encode())
+    email_address = hash_obj.hexdigest().lower()
 
     return email_address
 
@@ -61,15 +87,10 @@ def get_outside_email():
 
     try:
 
-        # try and use new util
         doc_text = get_document(session)
         clean_words = clean_and_format_document(doc_text)
-        # returned: ["It's", 'April', 'on', 'the', 'coast', 'of', 'Maine', 'and', "I'm", 'upside', 'down', 'underwater', 'again', 'The', "ocean's", 'surface', 'is', 'a', 'green', 'gauze', 'curtain', 'swaying', 'in', 'the', 'wind', 'and', 'I', "can't", 'tell', 'sideways', 'from', 'up', 'Think', 'I', 'force', 'my', 'numb', 'hands', 'to', 'loosen', 'their', 'grip', 'on', 'the', 'paddle', 'and', 'let', 'it', 'float', 'upward', 'finding', 'the', 'edge', 'of', 'my', 'kayak', "I've", 'run', 'out', 'of', 'air', 'to', 'blow', 'through', 'my', 'nostrils', 'but', 'I', 'can', 'hold', 'my', 'breath', 'a', 'little', 'longer', 'Remember', 'the', 'steps', 'Inside', 'the', 'cockpit', 'my', 'knees', 'grip', 'the', 'underside', 'of', 'the', 'deck', 'My', 'thoughts', 'are', 'frozen', 'sludge', 'like', 'honey', 'moving', 'to', 'the', 'bottom', 'of', 'an', 'overturned', 'jar', 'I', 'touch', 'the', 'blade', 'of', 'my', 'paddle', 'to', 'the', 'gunnel', 'wrench', 'my', 'shivering', 'muscles', 'forward', 'until', 'my', 'nose', 'is', 'nearly', 'touching', 'the', 'deck', 'and', 'sweep', 'the', 'paddle', 'forward', 'and', 'out', 'pulling', 'against', 'the', 'surface', 'like', "it's", 'something', 'solid', 'I', 'feel', 'half', 'my', 'face', 'touch', 'dry', 'air', 'and', 'gasp', 'taking', 'in', 'a', 'mouthful', 'of', 'water', 'before', 'I', 'crash', 'down', 'again', 'Panicking', 'I', 'abandon', 'the', 'paddle', 'tear', 'my', 'spray', 'skirt', 'off', 'the', 'combing', 'and', 'lunge', 'for', 'the', 'surface', 'kicking', 'my', 'legs', 'free', 'of', 'the', 'boat', 'Then', "I'm", 'floating', 'straining', 'against', 'the', 'tight', 'gasket', 'of', 'my', 'drysuit', 'to', 'suck', 'air', 'Twenty', 'feet', 'from', 'me', 'snow', 'is', 'erasing', 'the', 'beach', 'It', 'took', 'me', 'five', 'months', 'to', 'learn', 'to', 'roll', 'a', 'sea', 'kayak', 'dependbaly', 'and', 'from', 'either', 'side', 'It', 'took', 'another', 'two', 'before', 'I', 'could', 'do', 'it', 'in', 'surf', 'The', 'first', 'time', 'I', 'tried', 'was', 'in', 'the', 'warm', 'Pacific', 'waters', 'off', 'Baja', 'with', 'a', 'NOLS', 'instructor', 'shouting', 'advice', 'from', 'the', 'beach', 'Relax', 'Lunita', 'you', 'will', 'never', 'get', 'it', 'if', 'you', 'come', 'up', 'too', 'fast', 'Every', 'time', 'I', 'came', 'within', 'reach', 'of', 'the', 'surface', "I'd", 'jerk', 'my', 'head', 'toward', 'air', 'twisting', 'my', 'torso', 'and', 'stopping', 'the', 'momentum', 'of', 'the', 'roling', 'boat', 'Again', 'and', 'again', 'I', 'wet', 'exited', 'and', 'came', 'up', 'coughing', 'the', 'salt', 'water', 'searing', 'my', 'eyes', 'and', 'thraot', 'Three', 'weeks', 'before', 'on', 'the', 'first', 'day', 'of', "NOLS's", 'kayaking', 'section', 'a', 'storm', 'stranded', 'us', 'on', 'the', 'beach', 'From', 'benaeth', 'the', 'snapping', 'hem', 'of', 'a', 'tarp', 'I', 'watched', 'as', 'my', 'instructor', 'waded', 'out', 'into', 'the', 'whitecaps', 'smacked', 'his', 'bow', 'through', 'the', 'confused', 'chop', 'near', 'the', 'shoreline', 'and', 'began', 'to', 'surf', 'the', 'long', 'rearing', 'swells', 'as', 'they', 'tumbled', 'and', 'broke', 'Whenever', 'a', 'wave', 'sent', 'a', 'grappling', 'hook', 'of', 'heavy', 'water', 'over', 'his', 'gunnel', 'tipping', 'him', 'into', 'the', 'surge', 'of', 'foam', "he'd", 'roll', 'back', 'up', 'on', 'the', 'other', 'side', 'of', 'the', 'break', 'I', 'watched', 'the', 'instructor', 'get', 'pushed', 'by', 'the', 'white', 'crest', 'of', 'a', 'wave', 'like', 'a', 'sled', 'gathering', 'speed', 'it', 'was', 'the', 'most', 'graceful', 'thing', "I'd", 'ever', 'seen']
-
-        # Concatenate the spellchecker url to each word to simply make calls over iteration??
         word_urls = [f'https://outside-interview.herokuapp.com/spelling/{word}' for word in clean_words]
 
-        # Use a pool of threads to exc the various req calls concurrently as we wait for data
         with ThreadPoolExecutor(max_workers=None) as executor:
 
             misspelled_words = []
@@ -87,10 +108,7 @@ def get_outside_email():
         session.close()
 
         email_address = validate_and_hash(misspelled_words)
-        print(f'The outside email address, lets try this one: {email_address}@outsideinc.com')
-
-        # TODO: Clean up code, provide better doc-strings and UT. Then attempt to send over to the below email...
-        # Returned this!! 734c497e6d014b043dd961b6c4f472d1@outsideinc.com
+        print(email_address)
 
     except Exception as exc:
 
@@ -99,6 +117,42 @@ def get_outside_email():
         print(f'Error occurred - {exc}\n\n{stack}')
 
 
+# ======================================================================
+# Unit Testing
+# ----------------------------------------------------------------------
+TEST_DOC_TEXT = '\nUnit-testing.\n\nThis is forr the Outside interveiw test!'
+
+
+class SpellCheckerUnitTests(unittest.TestCase):
+
+    def test_clean_and_format_document(self):
+
+        # Test to see if we split the words correctly based on the regex patterns and formatting logic
+        words = clean_and_format_document(TEST_DOC_TEXT)
+        self.assertEqual(words, ['Unit', 'testing', 'This', 'is', 'forr', 'the', 'Outside', 'interveiw', 'test'])
+
+    def test_validate_and_hash(self):
+
+        email_address = validate_and_hash(['forr', 'interveiw'], TEST_DOC_TEXT)
+        self.assertEqual(email_address, '5ffbab63d0296f874bafe4f9bbdd2e73')
+
+        # then out of order...
+        with self.assertRaises(Exception):
+            validate_and_hash(['interview', 'forr'], TEST_DOC_TEXT)
+
+
 if __name__ == '__main__':
 
-    get_outside_email()
+    """ Util unit tests passing fwiw: 
+    
+    /home/steven/spellcheck/ve/bin/python /home/steven/spellcheck/email_gen/api/api.py
+    ..
+    ----------------------------------------------------------------------
+    Ran 2 tests in 0.000s
+    
+    OK
+    """
+
+    unittest.main()
+
+    # get_outside_email()
