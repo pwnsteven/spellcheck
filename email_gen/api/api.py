@@ -1,3 +1,4 @@
+import hashlib
 import re
 import requests
 import traceback
@@ -38,6 +39,22 @@ def clean_and_format_document(doc_text):
     return words
 
 
+def validate_and_hash(misspelled_words):
+    """ value: ['NOLS', 'roling', 'thraot', "NOLS's", 'benaeth'] """
+
+    # TODO: Double check this logic and write up some UTs. Don't have much experience with hashlib library...
+
+    if not misspelled_words:
+        raise Exception(f'No words misspelled words found')
+
+    # Concatenate and has (md5) the misspelled words to reveal the email address
+    hash_this = ''.join(misspelled_words)
+    hash_obj = hashlib.md5(hash_this.encode())      # I guess this needs to be encoded first
+    email_address = hash_obj.hexdigest().lower()    # Get lower-case hexdigest per specs
+
+    return email_address
+
+
 def get_outside_email():
 
     session = requests.Session()
@@ -69,8 +86,11 @@ def get_outside_email():
 
         session.close()
 
-        print(misspelled_words)
-        # ['NOLS', 'roling', 'thraot', "NOLS's", 'benaeth'] <------ This is what needs to be concatenated & hashed!!
+        email_address = validate_and_hash(misspelled_words)
+        print(f'The outside email address, lets try this one: {email_address}@outsideinc.com')
+
+        # TODO: Clean up code, provide better doc-strings and UT. Then attempt to send over to the below email...
+        # Returned this!! 734c497e6d014b043dd961b6c4f472d1@outsideinc.com
 
     except Exception as exc:
 
