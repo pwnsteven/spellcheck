@@ -1,5 +1,21 @@
+import re
 import requests
 import traceback
+
+
+def clean_and_format_document(doc_text):
+
+    # Split hyphens and spaces
+    doc_split_by_word = re.split(' |-', doc_text.replace('\n', ' '))
+
+    # Remove garbage, but keep apostrophized words
+    words = []
+    for word in doc_split_by_word:
+        clean_word = re.sub(r"[^A-Za-z']", "", word)
+        if clean_word:
+            words.append(clean_word)
+
+    return words
 
 
 def get_outside_email():
@@ -10,10 +26,14 @@ def get_outside_email():
 
         # Ping the api...
         doc_url = 'https://outside-interview.herokuapp.com/document'
-        print(f'getting document from url..')
         res = session.get(doc_url)
-        print(res.status_code)
-        print(res.text)
+
+        doc_text = res.text
+
+        clean_doc = clean_and_format_document(doc_text)
+        if len(clean_doc) != 434:
+            raise Exception(f'Double check the clean and format functionality: {len(doc_text)} != 434')
+
 
         """
         
